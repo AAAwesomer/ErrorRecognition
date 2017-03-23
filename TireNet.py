@@ -6,6 +6,13 @@ from tqdm import tqdm
 import sqlite3
 import tflearn
 import numpy as np
+import tflearn
+from tflearn.layers.conv import conv_2d, max_pool_2d
+from tflearn.layers.core import input_data, dropout, fully_connected
+from tflearn.layers.estimator import regression
+import tensorflow as tf
+
+tf.reset_default_graph()
 
 #fetch frames and labels from sqlite file
 conn = sqlite3.connect('/Users/mikko/Documents/AffectoFiles/basler_1487949884000.avi.db')
@@ -16,8 +23,10 @@ data = c.fetchall()
 #set parameters
 traindir = '/Users/mikko/Documents/AffectoFiles/TrainImgs'
 testdir = '/Users/mikko/Documents/AffectoFiles/TestImgs'
-imgsize = 80
-LR = 1e-3
+imgsize = 32
+learnrate = 1e-3
+
+modelname = 'tirelearning-{}-{}.model'.format(learnrate, '6convlearn3')
 
 #form lists from collected data
 frames = [str(row[0]) for row in data]
@@ -75,12 +84,6 @@ def create_train_data():
         img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
         img = cv2.resize(img, (imgsize,imgsize))
 
-##        ##test:
-##        plt.imshow(img, cmap='gray', interpolation='bicubic')
-##        plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
-##        plt.show()
-##        break
-
         #add data into training_data
         training_data.append([np.array(img),np.array(label)])
         
@@ -91,7 +94,79 @@ def create_train_data():
     np.save('train_data.npy', training_data)
     return training_data
 
-##traindata = create_train_data()
+def process_test_data():
+    testing_data = []
+    
+    #list with data from traindir
+    testlist = os.listdir(testdir)
+    
+    #remove apple's default DS_Store from list
+    del testlist[0]
+
+    #iterate through images
+    for img in testlist:
+        #remove '.png' and leading zeros
+        imgindex = img[:-4].lstrip("0")
+
+        #create path to image
+        path = os.path.join(testdir,img)
+
+        #read image into grayscale and resize
+        img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+        img = cv2.resize(img, (imgsize,imgsize))
+
+        #add data into training_data
+        testing_data.append([np.array(img),np.array(label)])
+        
+    #shuffle the data
+    shuffle(testing_data)
+
+    #save and return
+    np.save('test_data.npy', testing_data)
+    return testing_data
+
+traindata = create_train_data()
+
+convnet = input_data(shape=[None, imgsize, imgsize, 1], name='input')
+
+convnet = conv_2d(convnet, 32, 5, activation='relu')
+convnet = max_pool_2d(convnet, 5)
+
+convnet = conv_2d(convnet, 64, 5, activation='relu')
+convnet = max_pool_2d(convnet, 5)
+
+convnet = conv_2d(convnet, 64, 5, activation='relu')
+convnet = max_pool_2d(convnet, 5)
+
+convnet = conv_2d(convnet, 64, 5, activation='relu')
+convnet = max_pool_2d(convnet, 5)
+
+convnet = conv_2d(convnet, 64, 5, activation='relu')
+convnet = max_pool_2d(convnet, 5)
+
+convnet = fully_connected(convnet, 1024, activation='relu')
+convnet = dropout(convnet, 0.8)
+
+convnet = fully_connected(convnet, 3, activation='softmax')
+convnet = regression(convnet, optimizer='adam', learning_rate=learnrate, loss='categorical_crossentropy', name='targets')
+
+model = tflearn.DNN(convnet, tensorboard_dir='log')
+
+if os.path.exists('{}.meta'.format(modelname)):
+    model.load(modelname)
+    print('model loaded!')
+
+train = traindata[:-30]
+test = traindata[-30:]
+
+X = np.array([i[0] for i in train]).reshape(-1,imgsize,imgsize,1)
+Y = [i[1] for i in train]
+
+test_x = np.array([i[0] for i in test]).reshape(-1,imgsize,imgsize,1)
+test_y = [i[1] for i in test]
+
+model.fit({'input': X}, {'targets': Y}, n_epoch=8, validation_set=({'input': test_x}, {'targets': test_y}), 
+    snapshot_step=500, show_metric=True, run_id=modelname)
 
 
 
