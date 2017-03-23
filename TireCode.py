@@ -15,18 +15,18 @@ import tensorflow as tf
 tf.reset_default_graph()
 
 #fetch frames and labels from sqlite file
-conn = sqlite3.connect('/Users/mikko/Documents/AffectoFiles/basler_1487949884000.avi.db')
+conn = sqlite3.connect('/Users/mikko/Documents/TireFiles/basler_1487949884000.avi.db')
 c = conn.cursor()
 c.execute('SELECT frameno, labelsjson FROM labels')
 data = c.fetchall()
 
 #set parameters
-traindir = '/Users/mikko/Documents/AffectoFiles/TrainImgs'
-testdir = '/Users/mikko/Documents/AffectoFiles/TestImgs'
+traindir = '/Users/mikko/Documents/TireFiles/TrainImgs'
+testdir = '/Users/mikko/Documents/TireFiles/TestImgs'
 imgsize = 32
 learnrate = 1e-3
 
-modelname = 'tirelearning-{}-{}.model'.format(learnrate, '6convlearn3')
+modelname = 'tirelearning-{}-{}.model'.format(learnrate, '6convlearn4')
 
 #form lists from collected data
 frames = [str(row[0]) for row in data]
@@ -167,6 +167,9 @@ test_y = [i[1] for i in test]
 
 model.fit({'input': X}, {'targets': Y}, n_epoch=8, validation_set=({'input': test_x}, {'targets': test_y}), 
     snapshot_step=500, show_metric=True, run_id=modelname)
+
+
+
 
 
 
